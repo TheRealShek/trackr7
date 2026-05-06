@@ -193,7 +193,8 @@ Validate() error                     -- returns ErrInvalidConfig on:
 **auth**
 
 ```
-NewKeyCache(db db.DBConfig, refreshEvery time.Duration, rateLimit rate.Limit, rateBurst int) (*KeyCache, error)
+NewKeyCache(cfg db.DBConfig, refreshEvery time.Duration, rateLimit rate.Limit, rateBurst int, options ...auth.Config) (*KeyCache, error)
+Config { DBTimeout time.Duration }   -- 0 = no library-enforced timeout
 KeyCache.Middleware(next http.Handler) http.Handler
 KeyCache.Evict(keyID string)
 ```

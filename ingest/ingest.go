@@ -20,6 +20,7 @@ import (
 	"github.com/TheRealShek/trackr7/auth"
 	"github.com/TheRealShek/trackr7/db"
 	"github.com/TheRealShek/trackr7/schema"
+	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -245,6 +246,9 @@ func (h *handler) safeCallOnKafkaError(err error) {
 func validatePing(p pingRequest) error {
 	if p.UUID == "" {
 		return errors.New("uuid is required")
+	}
+	if _, err := uuid.Parse(p.UUID); err != nil {
+		return errors.New("uuid must be a valid RFC 4122 UUID")
 	}
 	if p.EntityID == "" {
 		return errors.New("entity_id is required")

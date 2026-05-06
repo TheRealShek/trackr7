@@ -39,6 +39,9 @@ type Config struct {
 	DB *pgxpool.Pool
 	// DBConfig controls table and column names for inserts.
 	DBConfig db.DBConfig
+	// DBTimeout bounds batch DB writes when the caller context has no deadline.
+	// 0 = no library-enforced timeout.
+	DBTimeout time.Duration
 	// BatchSize is the max number of messages per flush.
 	BatchSize int
 	// FlushEvery is the max time between flushes.
@@ -59,6 +62,7 @@ type Worker struct {
 	reader           *kafka.Reader
 	db               *pgxpool.Pool
 	dbConfig         db.DBConfig
+	dbTimeout        time.Duration
 	insertSQL        string
 	batchSize        int
 	flushEvery       time.Duration
@@ -136,6 +140,7 @@ func NewWorker(cfg Config) (*Worker, error) {
 		reader:           reader,
 		db:               cfg.DB,
 		dbConfig:         dbConfig,
+		dbTimeout:        cfg.DBTimeout,
 		insertSQL:        buildInsertSQL(dbConfig),
 		batchSize:        batchSize,
 		flushEvery:       flushEvery,
@@ -399,7 +404,16 @@ func (w *Worker) writeBatch(ctx context.Context, rows []rawLocationMessage) erro
 		ts = append(ts, row.TS)
 	}
 
-	_, err := w.db.Exec(ctx, w.insertSQL, uuids, entityIDs, entityTypes, lats, lngs, ts)
+	callCtx := ctx
+	if w.dbTimeout > 0 {
+		if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+			var cancel context.CancelFunc
+			callCtx, cancel = context.WithTimeout(ctx, w.dbTimeout)
+			defer cancel()
+		}
+	}
+
+	_, err := w.db.Exec(callCtx, w.insertSQL, uuids, entityIDs, entityTypes, lats, lngs, ts)
 	if err != nil {
 		return fmt.Errorf("insert locations batch: %w", err)
 	}

@@ -3,6 +3,7 @@ module github.com/TheRealShek/trackr7
 go 1.26.2
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/segmentio/kafka-go v0.4.51
 	golang.org/x/time v0.15.0

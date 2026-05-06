@@ -30,6 +30,13 @@ type contextKey int
 
 const entityTypeKey contextKey = 0
 
+// Config controls auth behavior that is not part of DB schema mapping.
+type Config struct {
+	// DBTimeout bounds auth DB calls when the caller context has no deadline.
+	// 0 = no library-enforced timeout.
+	DBTimeout time.Duration
+}
+
 // EntityTypeFromCtx extracts the entity type that Middleware injected into
 // the request context. Returns an empty string if not present.
 func EntityTypeFromCtx(ctx context.Context) string {
@@ -63,6 +70,7 @@ type KeyCache struct {
 	refreshEvery time.Duration
 	rateLimit    rate.Limit
 	rateBurst    int
+	dbTimeout    time.Duration
 
 	mu     sync.RWMutex
 	byID   map[string]*keyMetadata
@@ -89,10 +97,15 @@ type KeyCache struct {
 // token-bucket rate limiter applied to all keys.
 //
 // Returns ErrInvalidConfig if the DBConfig is invalid.
-func NewKeyCache(cfg db.DBConfig, refreshEvery time.Duration, rateLimit rate.Limit, rateBurst int) (*KeyCache, error) {
+func NewKeyCache(cfg db.DBConfig, refreshEvery time.Duration, rateLimit rate.Limit, rateBurst int, options ...Config) (*KeyCache, error) {
 	cfg = cfg.WithDefaults()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+
+	var authCfg Config
+	if len(options) > 0 {
+		authCfg = options[0]
 	}
 
 	return &KeyCache{
@@ -100,6 +113,7 @@ func NewKeyCache(cfg db.DBConfig, refreshEvery time.Duration, rateLimit rate.Lim
 		refreshEvery: refreshEvery,
 		rateLimit:    rateLimit,
 		rateBurst:    rateBurst,
+		dbTimeout:    authCfg.DBTimeout,
 		byID:         make(map[string]*keyMetadata),
 		byHash:       make(map[[32]byte]*keyMetadata),
 	}, nil
@@ -191,6 +205,8 @@ func (kc *KeyCache) Middleware(next http.Handler) http.Handler {
 
 // lookup finds key metadata by hash. Checks cache first (RLock), falls back
 // to a database query on miss.
+// Timing note: auth is keyed by full SHA-256 hash map lookup.
+// No stored-vs-computed byte comparison exists, so no timing oracle.
 func (kc *KeyCache) lookup(ctx context.Context, hash [32]byte) (*keyMetadata, error) {
 	kc.mu.RLock()
 	meta, ok := kc.byHash[hash]
@@ -219,7 +235,16 @@ func (kc *KeyCache) loadFromDB(ctx context.Context, hash [32]byte) (*keyMetadata
 		cols.KeyHash,
 	)
 
-	row := kc.cfg.Pool.QueryRow(ctx, query, hashHex)
+	callCtx := ctx
+	if kc.dbTimeout > 0 {
+		if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+			var cancel context.CancelFunc
+			callCtx, cancel = context.WithTimeout(ctx, kc.dbTimeout)
+			defer cancel()
+		}
+	}
+
+	row := kc.cfg.Pool.QueryRow(callCtx, query, hashHex)
 
 	var (
 		keyID      string
@@ -259,7 +284,16 @@ func (kc *KeyCache) refresh(ctx context.Context) error {
 		table,
 	)
 
-	rows, err := kc.cfg.Pool.Query(ctx, query)
+	callCtx := ctx
+	if kc.dbTimeout > 0 {
+		if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+			var cancel context.CancelFunc
+			callCtx, cancel = context.WithTimeout(ctx, kc.dbTimeout)
+			defer cancel()
+		}
+	}
+
+	rows, err := kc.cfg.Pool.Query(callCtx, query)
 	if err != nil {
 		return fmt.Errorf("auth: refresh query failed: %w", err)
 	}

@@ -36,7 +36,7 @@ func TestHooks_OnPingAccepted_OnPingRejected_OnKafkaError(t *testing.T) {
 	called := false
 	h.onPingAccepted = func() { called = true }
 
-	body := `{"uuid":"u1","entity_id":"e1","lat":1,"lng":2}`
+	body := `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"e1","lat":1,"lng":2}`
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
 	// set ContentLength so the handler sees it
 	req.ContentLength = int64(len(body))

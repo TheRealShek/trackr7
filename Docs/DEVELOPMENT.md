@@ -4,7 +4,7 @@ This guide covers local setup for developing and testing trackr7.
 
 ## Prerequisites
 
-- **Go**: Check `go.mod` for the minimum version (currently 1.21+)
+- **Go**: 1.26.2
 - **Docker**: For running local Postgres
 - **make**: For running common development tasks
 
@@ -33,11 +33,28 @@ docker exec -it trackr7-postgres psql -U trackr7 -d trackr7_test  # Connect to D
 
 ## Schema Setup
 
+Trackr7 does not run migrations for you. The SQL in `schema/migrations/001_init.sql` is reference-only.
+
 Apply the reference schema to your local database:
 
 ```bash
 docker exec -i trackr7-postgres psql -U trackr7 -d trackr7_test < schema/migrations/001_init.sql
 ```
+
+This step is required for running the example app. Integration tests create and drop their own tables automatically.
+
+If your schema diverges from reference, apply your schema SQL directly in `psql`:
+
+```bash
+docker exec -it trackr7-postgres psql -U trackr7 -d trackr7_test
+```
+
+Inside `psql`:
+
+1. Paste your schema SQL from clipboard.
+2. Press Enter until the full script finishes.
+3. Run `\dt` to confirm tables exist.
+4. Run `\q` to exit.
 
 ## Environment Setup
 
@@ -53,16 +70,16 @@ Edit `.env`:
 TRACKR7_TEST_DSN=postgres://trackr7:trackr7@localhost:5432/trackr7_test
 ```
 
+The Makefile sources `.env` automatically via `-include .env` — you do not need to export variables manually.
+
 ## Running Tests
 
 ```bash
-make test                    # Unit tests only
-make test-integration        # Full suite with database
-make bench                   # Benchmarks (no database)
-make bench-integration       # Benchmarks with database
+make test
+make test-integration
 ```
 
-See [TESTING.md](TESTING.md) for full test documentation.
+Use `make test` for the default local development loop. Use `make test-integration` after setting `TRACKR7_TEST_DSN` in `.env`. See [TESTING.md](TESTING.md) for full test and benchmark documentation.
 
 ## Common Issues
 

@@ -90,13 +90,31 @@ The `db.DBConfig` struct allows overriding table names and column mappings.
 
 ## Constraints
 
-- **Go**: Requires Go 1.21+.
+- **Go**: Requires Go 1.26.2.
 - **Identifiers**: All table and column names must match `^[a-z0-9_.]+$`.
 - **No Quoting**: trackr7 does not quote identifiers in generated SQL. Uppercase or special characters will cause SQL syntax errors.
 - **Database**: Requires Postgres 12+ (for BRIN indexes) and a Kafka-compatible broker (e.g., Redpanda).
 - **Memory**: The `cache.Store` keeps the latest location for every active entity in memory.
 - **Consistency**: The cache is **eventually consistent**. Callers should use the returned `fetchedAt` timestamp to verify data freshness.
 - **Validation**: Incorrect `DBConfig` mappings lead to undefined behavior or silent runtime failures.
+
+## Security
+
+### Admin Authentication
+
+`admin.KeyManager` is a direct management interface with no authentication layer. Callers must protect any endpoint or code path that calls `CreateKey`, `RevokeKey`, or `ListKeys` with their own authentication and authorization controls. trackr7 does not do this for you.
+
+### Key Revocation Window
+
+Key revocation is eventual. A revoked key remains valid for up to `refreshEvery` duration (default 5 minutes) until the cache refreshes. For immediate revocation wire `admin.RevokeKey` to `auth.KeyCache.Evict(keyID)` after DB write. If you do not wire this, plan around the window.
+
+### Kafka Trust Boundary
+
+`writer` and `cache` trust all messages on the Kafka topic. Treat the Kafka broker and `location.raw` topic as a hard security boundary, same trust level as your database credentials. Use Kafka ACLs and TLS. Do not expose the broker publicly.
+
+### Audit Log Integrity
+
+`audit_log` is append-only by convention only. A database admin can delete rows silently. trackr7 provides no cryptographic integrity guarantees on audit records. For tamper-evidence use DB-native controls: restricted roles, logical replication to an immutable sink, or WORM storage.
 
 ## Schema Requirements
 

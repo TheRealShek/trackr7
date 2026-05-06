@@ -84,17 +84,17 @@ func TestValidatePing(t *testing.T) {
 		req     pingRequest
 		wantErr string
 	}{
-		{"valid", pingRequest{"abc", "ent1", 12.5, 77.0}, ""},
+		{"valid", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 12.5, 77.0}, ""},
 		{"missing uuid", pingRequest{"", "ent1", 12.5, 77.0}, "uuid is required"},
-		{"missing entity_id", pingRequest{"abc", "", 12.5, 77.0}, "entity_id is required"},
-		{"lat too low", pingRequest{"abc", "ent1", -91, 77.0}, "lat must be between"},
-		{"lat too high", pingRequest{"abc", "ent1", 91, 77.0}, "lat must be between"},
-		{"lng too low", pingRequest{"abc", "ent1", 12.5, -181}, "lng must be between"},
-		{"lng too high", pingRequest{"abc", "ent1", 12.5, 181}, "lng must be between"},
-		{"boundary lat -90", pingRequest{"abc", "ent1", -90, 0}, ""},
-		{"boundary lat 90", pingRequest{"abc", "ent1", 90, 0}, ""},
-		{"boundary lng -180", pingRequest{"abc", "ent1", 0, -180}, ""},
-		{"boundary lng 180", pingRequest{"abc", "ent1", 0, 180}, ""},
+		{"missing entity_id", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "", 12.5, 77.0}, "entity_id is required"},
+		{"lat too low", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", -91, 77.0}, "lat must be between"},
+		{"lat too high", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 91, 77.0}, "lat must be between"},
+		{"lng too low", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 12.5, -181}, "lng must be between"},
+		{"lng too high", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 12.5, 181}, "lng must be between"},
+		{"boundary lat -90", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", -90, 0}, ""},
+		{"boundary lat 90", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 90, 0}, ""},
+		{"boundary lng -180", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 0, -180}, ""},
+		{"boundary lng 180", pingRequest{"550e8400-e29b-41d4-a716-446655440000", "ent1", 0, 180}, ""},
 	}
 
 	for _, tt := range tests {
@@ -127,7 +127,7 @@ func newTestRequest(t *testing.T, method, body, entityType string) *http.Request
 }
 
 func TestHandlerServeHTTP(t *testing.T) {
-	validBody := `{"uuid":"abc-123","entity_id":"truck-1","lat":28.6139,"lng":77.2090}`
+	validBody := `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"truck-1","lat":28.6139,"lng":77.2090}`
 
 	tests := []struct {
 		name       string
@@ -159,7 +159,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		},
 		{
 			name:       "unknown field rejected",
-			body:       `{"uuid":"abc","entity_id":"e1","lat":10,"lng":20,"extra":"bad"}`,
+			body:       `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"e1","lat":10,"lng":20,"extra":"bad"}`,
 			entityType: "vehicle",
 			wantStatus: http.StatusBadRequest,
 			wantError:  "invalid JSON",
@@ -173,7 +173,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		},
 		{
 			name:       "invalid lat",
-			body:       `{"uuid":"abc","entity_id":"e1","lat":999,"lng":20}`,
+			body:       `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"e1","lat":999,"lng":20}`,
 			entityType: "vehicle",
 			wantStatus: http.StatusBadRequest,
 			wantError:  "lat must be between",
@@ -227,7 +227,7 @@ func TestKafkaMessageShape(t *testing.T) {
 		logger:   schema.SafeLogger(nil),
 	}
 
-	body := `{"uuid":"msg-uuid","entity_id":"truck-42","lat":28.6139,"lng":77.2090}`
+	body := `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"truck-42","lat":28.6139,"lng":77.2090}`
 	req := newTestRequest(t, http.MethodPost, body, "vehicle")
 	rec := httptest.NewRecorder()
 
@@ -253,8 +253,8 @@ func TestKafkaMessageShape(t *testing.T) {
 		t.Fatalf("unmarshal kafka value: %v", err)
 	}
 
-	if km.UUID != "msg-uuid" {
-		t.Errorf("uuid = %q, want %q", km.UUID, "msg-uuid")
+	if km.UUID != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Errorf("uuid = %q, want %q", km.UUID, "550e8400-e29b-41d4-a716-446655440000")
 	}
 	if km.EntityID != "truck-42" {
 		t.Errorf("entity_id = %q, want %q", km.EntityID, "truck-42")
@@ -340,7 +340,7 @@ func TestEntityTypeFromContext(t *testing.T) {
 		logger:   schema.SafeLogger(nil),
 	}
 
-	body := `{"uuid":"u1","entity_id":"e1","lat":10,"lng":20}`
+	body := `{"uuid":"550e8400-e29b-41d4-a716-446655440000","entity_id":"e1","lat":10,"lng":20}`
 	req := newTestRequest(t, http.MethodPost, body, "courier")
 	rec := httptest.NewRecorder()
 

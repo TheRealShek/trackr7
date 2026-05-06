@@ -4,7 +4,7 @@ This document outlines how to run tests for the trackr7 library.
 
 ## Prerequisites
 
-- **Go**: 1.22 or higher
+- **Go**: 1.26.2
 - **Postgres**: 15+ (for integration tests)
 - **Kafka / Redpanda**: (for writer/cache integration tests in later phases)
 
