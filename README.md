@@ -2,6 +2,12 @@
 
 trackr7 is an embeddable Go library for real-time entity location tracking. It provides a Kafka-backed pipeline for high-throughput ingestion, batch database writes, and an in-memory latest-location cache.
 
+## Docs
+
+- **[Architecture plan](Docs/HLD.md)**: Read this if you're embedding trackr7 into your service or making architectural decisions. It explains the design, package structure, and API contracts.
+- **[Testing guide](Docs/TESTING.md)**: Read this to understand how to run tests and benchmarks, including setup for integration tests with `TRACKR7_TEST_DSN`.
+- **[Development guide](Docs/DEVELOPMENT.md)**: Read this to set up a local development environment with Docker and run the full test suite locally.
+
 ## What it does
 
 - Ingests location events via HTTP and produces to Kafka.
@@ -42,6 +48,22 @@ go run -tags example example/main.go
 
 The example includes observability hooks and a sample `stdLogger` for logging events.
 
+## Building & Testing
+
+The project includes a `Makefile` for common development tasks. Copy `.env.example` to `.env` and set `TRACKR7_TEST_DSN` for integration tests.
+
+```bash
+make vet                 # Run go vet
+make test                # Run unit tests with race detector
+make test-integration    # Run all tests including integration
+make bench               # Run benchmarks
+make bench-integration   # Run benchmarks with integration tests
+make tidy                # Run go mod tidy
+make all                 # Run vet + test
+```
+
+See the [testing guide](Docs/TESTING.md) for details.
+
 ## Configuration
 
 ### Kafka
@@ -68,6 +90,7 @@ The `db.DBConfig` struct allows overriding table names and column mappings.
 
 ## Constraints
 
+- **Go**: Requires Go 1.21+.
 - **Identifiers**: All table and column names must match `^[a-z0-9_.]+$`.
 - **No Quoting**: trackr7 does not quote identifiers in generated SQL. Uppercase or special characters will cause SQL syntax errors.
 - **Database**: Requires Postgres 12+ (for BRIN indexes) and a Kafka-compatible broker (e.g., Redpanda).

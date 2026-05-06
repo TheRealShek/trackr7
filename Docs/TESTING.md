@@ -12,6 +12,18 @@ This document outlines how to run tests for the trackr7 library.
 
 Trackr7 uses standard Go testing tools. We separate fast unit tests from slower integration tests using an environment variable.
 
+### Makefile Targets
+
+```bash
+make test
+make test-integration
+make bench
+make bench-integration
+make vet
+make tidy
+make all
+```
+
 ### Unit Tests Only
 
 To run fast, mock-free unit tests (skips DB/Kafka integration tests):
@@ -46,3 +58,16 @@ go test ./... -v -count=1 -race
 ### Why skip without DSN?
 
 We skip integration tests when `TRACKR7_TEST_DSN` is absent to ensure the default `go test ./...` command completes instantly for local development and doesn't fail spuriously if a local Postgres instance isn't running. CI pipelines are responsible for setting the DSN and running the full suite.
+
+## Running Benchmarks
+
+```bash
+# Unit benchmarks only (no DSN needed)
+go test -bench=. -benchmem ./...
+
+# With integration benchmarks
+export TRACKR7_TEST_DSN="postgres://user:password@localhost:5432/trackr7_test"
+go test -bench=. -benchmem ./...
+```
+
+Integration benchmarks skip cleanly if `TRACKR7_TEST_DSN` is unset, same as integration tests.

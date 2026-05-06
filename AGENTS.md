@@ -4,7 +4,7 @@
 
 trackr7 is an embeddable Go library for real-time entity location tracking. It is a **library, not a service** — no main packages exist except `cmd/trackr7-admin`. The user owns the server, connections, and lifecycle. trackr7 owns correctness.
 
-Full design: `.docs/HLD.md` — read it before making architectural decisions.
+Full design: `Docs/HLD.md` — read it before making architectural decisions.
 
 ## Package structure
 
@@ -47,7 +47,7 @@ Integration tests require `TRACKR7_TEST_DSN` environment variable pointing to a 
 - **Identifiers must match `^[a-z0-9_.]+$`.** trackr7 does not quote identifiers in generated SQL. Uppercase, quotes, spaces, or special characters will break queries.
 - **Configurable table and column names.** Never hardcode table or column names. Always read from DBConfig.
 - **Schema-qualified paths allowed.** Table names like `"trackr.locations"` must pass through as-is.
-- **HLD is the source of truth.** If a change affects architecture, API surface, package structure, or design constraints, ask permission to update `.docs/HLD.md` before or alongside the code change. Do not silently diverge from the HLD.
+- **HLD is the source of truth.** If a change affects architecture, API surface, package structure, or design constraints, ask permission to update `Docs/HLD.md` before or alongside the code change. Do not silently diverge from the HLD.
 
 ## Exported errors (schema/errors.go)
 
@@ -86,7 +86,7 @@ Portfolio-ready: Pending (TRACKR7_TEST_DSN not set for integration runs).
 
 ## Things to avoid
 
-- Do not invent API surface. Match `.docs/HLD.md` exactly.
+- Do not invent API surface. Match `Docs/HLD.md` exactly.
 - Do not add `Migrate()` or any DDL execution.
 - Do not use `//go:embed` for SQL (reference only, not embedded).
 - No nil checks or error suppression as first response to a problem.
