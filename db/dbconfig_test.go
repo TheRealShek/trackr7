@@ -17,9 +17,9 @@ var stubPool = &pgxpool.Pool{}
 
 func TestWithDefaults(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  DBConfig
-		check  func(t *testing.T, got DBConfig)
+		name  string
+		input DBConfig
+		check func(t *testing.T, got DBConfig)
 	}{
 		{
 			name:  "zero value fills all 17 defaults",

@@ -37,40 +37,60 @@ type DBConfig struct {
 	MaxConns int
 
 	// Table names. Accept schema-qualified paths (e.g. "myschema.locations").
+	// LocationsTable is the target table for location writes.
 	LocationsTable string
-	APIKeysTable   string
-	AuditLogTable  string
+	// APIKeysTable is the source of API key metadata.
+	APIKeysTable string
+	// AuditLogTable is the append-only audit log table.
+	AuditLogTable string
 
 	// Column name mappings. Zero value = defaults applied by WithDefaults().
+	// LocationColumns maps the locations table columns.
 	LocationColumns LocationColumnMap
-	APIKeyColumns   APIKeyColumnMap
+	// APIKeyColumns maps the api_keys table columns.
+	APIKeyColumns APIKeyColumnMap
+	// AuditLogColumns maps the audit_log table columns.
 	AuditLogColumns AuditLogColumnMap
 }
 
 // LocationColumnMap maps Go field names to actual column names in the locations table.
 type LocationColumnMap struct {
-	UUID       string
-	EntityID   string
+	// UUID maps the uuid column name.
+	UUID string
+	// EntityID maps the entity_id column name.
+	EntityID string
+	// EntityType maps the entity_type column name.
 	EntityType string
-	Lat        string
-	Lng        string
-	TS         string
+	// Lat maps the lat column name.
+	Lat string
+	// Lng maps the lng column name.
+	Lng string
+	// TS maps the ts column name.
+	TS string
 }
 
 // APIKeyColumnMap maps Go field names to actual column names in the api_keys table.
 type APIKeyColumnMap struct {
-	KeyID      string
-	KeyHash    string
+	// KeyID maps the key_id column name.
+	KeyID string
+	// KeyHash maps the key_hash column name.
+	KeyHash string
+	// EntityType maps the entity_type column name.
 	EntityType string
-	Revoked    string
-	CreatedAt  string
+	// Revoked maps the revoked column name.
+	Revoked string
+	// CreatedAt maps the created_at column name.
+	CreatedAt string
 }
 
 // AuditLogColumnMap maps Go field names to actual column names in the audit_log table.
 type AuditLogColumnMap struct {
-	KeyID  string
+	// KeyID maps the key_id column name.
+	KeyID string
+	// Action maps the action column name.
 	Action string
-	TS     string
+	// TS maps the ts column name.
+	TS string
 }
 
 // withDefault returns val if non-empty, otherwise fallback.

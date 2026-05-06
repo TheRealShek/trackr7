@@ -78,6 +78,7 @@ User's HTTP server
 > This is the user's responsibility.
 
 **`locations`** — trackr7 writes all 6 columns (writer). Reads none from DB directly.
+
 ```sql
 uuid        TEXT PRIMARY KEY,
 entity_id   TEXT NOT NULL,
@@ -86,9 +87,11 @@ lat         FLOAT8 NOT NULL,
 lng         FLOAT8 NOT NULL,
 ts          BIGINT NOT NULL   -- server UTC ms, display-only
 ```
+
 Recommended indexes: B-tree on `entity_id`, BRIN on `ts`
 
 **`api_keys`** — trackr7 reads: key_id, key_hash, entity_type, revoked (auth). Writes all 5 columns (admin).
+
 ```sql
 key_id      UUID PRIMARY KEY,
 key_hash    TEXT NOT NULL,
@@ -98,6 +101,7 @@ created_at  BIGINT NOT NULL
 ```
 
 **`audit_log`** — trackr7 writes all 3 columns (admin). Append-only, no PK.
+
 ```sql
 key_id   UUID,
 action   TEXT,    -- created | revoked
@@ -114,13 +118,13 @@ Library uses names as-is in queries — no assumptions about schema.
 
 ```json
 {
-  "uuid":        "client-generated, mandatory",
-  "entity_id":   "string",
+  "uuid": "client-generated, mandatory",
+  "entity_id": "string",
   "entity_type": "string",
-  "lat":         "float64",
-  "lng":         "float64",
-  "ts":          "server-stamped UTC unix ms",
-  "v":           1
+  "lat": "float64",
+  "lng": "float64",
+  "ts": "server-stamped UTC unix ms",
+  "v": 1
 }
 ```
 
@@ -129,12 +133,14 @@ Library uses names as-is in queries — no assumptions about schema.
 ## Public API Surface
 
 **schema**
+
 ```
 Location  { UUID, EntityID, EntityType, Lat, Lng, TS }
 KeyInfo   { KeyID, EntityType, Revoked, CreatedAt }
 ```
 
 **db**
+
 ```
 DBConfig {
     Pool              *pgxpool.Pool
@@ -185,13 +191,15 @@ Validate() error                     -- returns ErrInvalidConfig on:
 ```
 
 **auth**
+
 ```
-NewKeyCache(db db.DBConfig, refreshEvery) *KeyCache
+NewKeyCache(db db.DBConfig, refreshEvery time.Duration, rateLimit rate.Limit, rateBurst int) (*KeyCache, error)
 KeyCache.Middleware(next http.Handler) http.Handler
 KeyCache.Evict(keyID string)
 ```
 
 KeyCache internals:
+
 ```
 KeyMetadata { KeyID, Hash[32]byte, EntityType, Limiter, Revoked }
 miss  → DB lookup → populate → proceed
@@ -201,6 +209,7 @@ Revocation: DB update + immediate Evict()
 ```
 
 **ingest**
+
 ```
 Config {
     Kafka      *kafka.Writer
@@ -213,6 +222,7 @@ NewHandler(cfg Config) (http.Handler, error)
 ```
 
 **writer**
+
 ```
 Config {
     KafkaBrokers  []string
@@ -229,6 +239,7 @@ Worker.Run(ctx context.Context) error
 ```
 
 **cache**
+
 ```
 Config {
     KafkaBrokers  []string
@@ -244,8 +255,9 @@ Store.ReadinessHandler() http.HandlerFunc   -- 503 until HWM reached
 ```
 
 **admin**
+
 ```
-NewKeyManager(db db.DBConfig) *KeyManager
+NewKeyManager(pool *pgxpool.Pool, cfg db.DBConfig) (*KeyManager, error)
 KeyManager.CreateKey(ctx, entityType string) (plaintext string, err error)
 KeyManager.RevokeKey(ctx, keyID string) error
 KeyManager.ListKeys(ctx context.Context) ([]schema.KeyInfo, error)
@@ -309,7 +321,7 @@ dbCfg := db.DBConfig{
     // APIKeyColumns and AuditLogColumns zero value = defaults applied.
 }
 
-keyCache := auth.NewKeyCache(dbCfg, 5*time.Minute)
+keyCache, _ := auth.NewKeyCache(dbCfg, 5*time.Minute, rate.Every(time.Second), 10)
 
 ingestH, _ := ingest.NewHandler(ingest.Config{
     Kafka: kafkaWriter, DB: dbCfg, Auth: keyCache,
@@ -347,43 +359,43 @@ mux.HandleFunc("/location/{id}", func(w http.ResponseWriter, r *http.Request) {
 
 ## Design Constraints
 
-| Constraint | Detail |
-|---|---|
-| Schema ownership | User owns all DDL. Library ships reference SQL as docs, never executes it. |
-| Table name flexibility | All table names configurable via `DBConfig`. Accept schema-qualified paths (`schema.table`). |
-| Column name flexibility | Every column trackr7 reads or writes is configurable via column mapping structs. |
-| Column type contract | Library trusts user's column types match reference SQL. Mismatch = undefined behavior. No runtime type validation. |
-| Pool isolation | `MaxConns > 0` → library creates a sub-pool to prevent writer batch writes from exhausting user's shared pool. |
+| Constraint              | Detail                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Schema ownership        | User owns all DDL. Library ships reference SQL as docs, never executes it.                                         |
+| Table name flexibility  | All table names configurable via `DBConfig`. Accept schema-qualified paths (`schema.table`).                       |
+| Column name flexibility | Every column trackr7 reads or writes is configurable via column mapping structs.                                   |
+| Column type contract    | Library trusts user's column types match reference SQL. Mismatch = undefined behavior. No runtime type validation. |
+| Pool isolation          | `MaxConns > 0` → library creates a sub-pool to prevent writer batch writes from exhausting user's shared pool.     |
 
 ---
 
 ## Guarantees
 
-| Guarantee | Status |
-|---|---|
-| At-least-once delivery | ✓ commit after DB write |
-| Dedupe | ✓ `ON CONFLICT (uuid) DO NOTHING` |
-| Ordering | Kafka partition only. `ts` display-only, never used for ordering |
-| Crash recovery | replay from last committed offset |
-| Revocation | eventual, max `refreshEvery` window. documented |
-| Rate limiting | per-key token bucket, single instance only |
-| Cache consistency | eventually consistent. self-corrects on next ping. `FetchedAt` exposed to caller |
-| Consumer group isolation | library-owned group IDs. misuse impossible |
-| Horizontal scale | not v1 — Redis needed for rate limit + shared cache |
-| Column type safety | NOT guaranteed. User must match reference SQL types. Mismatch = undefined behavior. |
-| Schema migrations | NOT managed. User's responsibility. Library documents expected schema only. |
+| Guarantee                | Status                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| At-least-once delivery   | ✓ commit after DB write                                                             |
+| Dedupe                   | ✓ `ON CONFLICT (uuid) DO NOTHING`                                                   |
+| Ordering                 | Kafka partition only. `ts` display-only, never used for ordering                    |
+| Crash recovery           | replay from last committed offset                                                   |
+| Revocation               | eventual, max `refreshEvery` window. documented                                     |
+| Rate limiting            | per-key token bucket, single instance only                                          |
+| Cache consistency        | eventually consistent. self-corrects on next ping. `FetchedAt` exposed to caller    |
+| Consumer group isolation | library-owned group IDs. misuse impossible                                          |
+| Horizontal scale         | not v1 — Redis needed for rate limit + shared cache                                 |
+| Column type safety       | NOT guaranteed. User must match reference SQL types. Mismatch = undefined behavior. |
+| Schema migrations        | NOT managed. User's responsibility. Library documents expected schema only.         |
 
 ---
 
 ## Dependencies
 
-| Dep | Why |
-|---|---|
-| `segmentio/kafka-go` | pure Go, no CGO |
-| `jackc/pgx/v5` | UNNEST batch |
-| `golang.org/x/time/rate` | token bucket |
-| `google/uuid` | client UUID gen (user-side) |
-| Redpanda | single binary Kafka-compatible broker |
+| Dep                      | Why                                   |
+| ------------------------ | ------------------------------------- |
+| `segmentio/kafka-go`     | pure Go, no CGO                       |
+| `jackc/pgx/v5`           | UNNEST batch                          |
+| `golang.org/x/time/rate` | token bucket                          |
+| `google/uuid`            | client UUID gen (user-side)           |
+| Redpanda                 | single binary Kafka-compatible broker |
 
 Nothing else until real problem demands it.
 
@@ -391,16 +403,16 @@ Nothing else until real problem demands it.
 
 ## Build Phases
 
-| Phase | Package | Output |
-|---|---|---|
-| 1 | `schema/` + `db/` | schema: types, exported errors, reference SQL. db: DBConfig, column maps, WithDefaults(), Validate() |
-| 2 | `auth/` | KeyCache, Middleware, rate limiter |
-| 3 | `ingest/` | `http.Handler`, auth wired |
-| 4 | `writer/` | Worker, owns reader, UNNEST batch |
-| 5 | `cache/` | Store, owns reader, `FetchedAt`, readiness probe |
-| 6 | `admin/` | KeyManager |
-| 7 | `cmd/trackr7-admin/` | thin CLI |
-| 8 | Metrics hooks + audit log | observability |
-| 9 | Benchmark + godoc + README + example app | release ready |
+| Phase | Package                                  | Output                                                                                               |
+| ----- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1     | `schema/` + `db/`                        | schema: types, exported errors, reference SQL. db: DBConfig, column maps, WithDefaults(), Validate() |
+| 2     | `auth/`                                  | KeyCache, Middleware, rate limiter                                                                   |
+| 3     | `ingest/`                                | `http.Handler`, auth wired                                                                           |
+| 4     | `writer/`                                | Worker, owns reader, UNNEST batch                                                                    |
+| 5     | `cache/`                                 | Store, owns reader, `FetchedAt`, readiness probe                                                     |
+| 6     | `admin/`                                 | KeyManager                                                                                           |
+| 7     | `cmd/trackr7-admin/`                     | thin CLI                                                                                             |
+| 8     | Metrics hooks + audit log                | observability                                                                                        |
+| 9     | Benchmark + godoc + README + example app | release ready                                                                                        |
 
 ---
